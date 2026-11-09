@@ -1,0 +1,371 @@
+openapi: 3.1.0
+info:
+  title: RetroLot API
+  version: 1.0.0
+  description: Online auction of vintage items. Errors use application/problem+json (see docs/errors.md).
+servers:
+  - url: /api
+components:
+  securitySchemes:
+    session: { type: apiKey, in: cookie, name: sid }
+  parameters:
+    id: { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    size: { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 60, default: 20 } }
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, examples: [/problems/bid_too_low] }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        requestId: { type: string, format: uuid }
+        errors:
+          type: array
+          items: { type: object, properties: { field: { type: string }, rule: { type: string } } }
+        min_bid: { type: integer }
+        max_bid: { type: integer, description: Largest single bid allowed now (10x the next minimum) }
+    Page:
+      type: object
+      required: [items, total, page, pages]
+      properties:
+        items: { type: array, items: {} }
+        total: { type: integer }
+        page: { type: integer }
+        pages: { type: integer }
+    LotCard:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        start_price: { type: integer }
+        current_price: { type: integer }
+        bid_count: { type: integer }
+        starts_at: { type: integer, description: Unix ms }
+        ends_at: { type: integer, description: Unix ms }
+        status: { type: string, enum: [pending, rejected, active, ended, cancelled, withdrawn] }
+        category_id: { type: integer }
+        image: { type: string }
+    LotPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/LotCard' } }
+            now: { type: integer }
+    Bid:
+      type: object
+      properties:
+        id: { type: integer }
+        amount: { type: integer }
+        is_auto: { type: integer, enum: [0, 1] }
+        created_at: { type: integer }
+        bidder: { type: integer, description: Anonymous bidder number within the lot }
+        mine: { type: boolean }
+    Lot:
+      allOf:
+        - $ref: '#/components/schemas/LotCard'
+        - type: object
+          properties:
+            description: { type: string }
+            min_step: { type: integer }
+            min_bid: { type: integer }
+            images: { type: array, items: { type: string } }
+            tags: { type: array, items: { type: string } }
+            bids: { type: array, items: { $ref: '#/components/schemas/Bid' } }
+            is_owner: { type: boolean }
+            can_edit: { type: boolean }
+            leading: { type: boolean }
+            watching: { type: boolean }
+            my_auto: { type: [integer, 'null'] }
+            my_payment: { $ref: '#/components/schemas/PaymentShort' }
+            winner: { type: object, description: Seller/admin only; contacts after payment }
+            seller: { type: object, description: Admin only }
+            now: { type: integer }
+    LotInput:
+      type: object
+      required: [title, description, category_id, start_price, min_step, starts_at, ends_at]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 120 }
+        description: { type: string, minLength: 10, maxLength: 5000 }
+        category_id: { type: integer }
+        start_price: { type: integer, minimum: 1 }
+        min_step: { type: integer, minimum: 1 }
+        starts_at: { type: integer }
+        ends_at: { type: integer }
+        tags: { type: array, maxItems: 10, items: { type: string } }
+        images:
+          type: array
+          minItems: 3
+          maxItems: 10
+          items: { type: string, description: 'data:image/(jpeg|png|webp);base64,... or an existing /uploads path (edit)' }
+    SellerInput:
+      type: object
+      required: [first_name, last_name, phone, address, card_number]
+      properties:
+        first_name: { type: string }
+        last_name: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        card_number: { type: string, description: Luhn-checked, only last 4 stored }
+    PaymentShort:
+      type: object
+      properties:
+        id: { type: integer }
+        amount: { type: integer }
+        status: { type: string, enum: [pending, paid, expired] }
+        due_at: { type: integer }
+    Profile:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string, format: email }
+        name: { type: string }
+        role: { type: string, enum: [bidder, seller, admin] }
+        blocked: { type: integer }
+        first_name: { type: [string, 'null'] }
+        last_name: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        address: { type: [string, 'null'] }
+paths:
+  /health:
+    get:
+      summary: Liveness and DB check
+      responses: { '200': { description: OK } }
+  /config:
+    get:
+      summary: Public client config (Google login enabled, support email)
+      responses: { '200': { description: OK } }
+  /auth/register:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties: { email: { type: string, format: email }, password: { type: string, minLength: 8 }, name: { type: string, minLength: 2 } }
+      responses:
+        '201': { description: Created, sets sid cookie, content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /auth/login:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email, password], properties: { email: { type: string }, password: { type: string } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /auth/logout:
+    post: { responses: { '204': { description: Logged out } } }
+  /auth/me:
+    get:
+      security: [{ session: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+    patch:
+      security: [{ session: [] }]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Problem' } }
+  /auth/google:
+    get: { summary: Redirect to Google OAuth, responses: { '302': { description: Redirect }, '404': { $ref: '#/components/responses/Problem' } } }
+  /auth/google/callback:
+    get: { summary: OAuth callback, responses: { '302': { description: Redirect to / or /login?error=google } } }
+  /categories:
+    get: { responses: { '200': { description: OK } } }
+  /tags:
+    get: { responses: { '200': { description: OK } } }
+  /lots:
+    get:
+      summary: Public catalogue (active lots), server-side filter and paging
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: category, in: query, schema: { type: integer } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: min, in: query, schema: { type: integer } }
+        - { name: max, in: query, schema: { type: integer } }
+        - { name: state, in: query, schema: { type: string, enum: [all, live, upcoming] } }
+        - { name: sort, in: query, schema: { type: string, enum: [ends, starts, new, price_asc, price_desc] } }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LotPage' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+    post:
+      summary: Create a lot (goes to moderation)
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/LotInput'
+                - type: object
+                  required: [images, seller]
+                  properties: { seller: { $ref: '#/components/schemas/SellerInput' } }
+      responses:
+        '201': { description: Created }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /lots/mine:
+    get:
+      security: [{ session: [] }]
+      parameters: [{ name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/page' }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LotPage' } } } } }
+  /history:
+    get:
+      security: [{ session: [] }]
+      parameters:
+        - { name: filter, in: query, schema: { type: string, enum: [all, bought, sold, bid] } }
+        - { name: q, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/page'
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LotPage' } } } } }
+  /watchlist:
+    get:
+      security: [{ session: [] }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LotPage' } } } } }
+  /bids/mine:
+    get:
+      security: [{ session: [] }]
+      responses: { '200': { description: OK } }
+  /lots/{id}:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      summary: Lot page. Hidden lots answer 404 to everyone but owner and admin.
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Lot' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      summary: Edit, only before the first bid; sends the lot back to moderation
+      security: [{ session: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LotInput' } } } }
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /lots/{id}/withdraw:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      security: [{ session: [] }]
+      responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Problem' } }
+  /lots/{id}/watch:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    put: { security: [{ session: [] }], responses: { '200': { description: OK } } }
+    delete: { security: [{ session: [] }], responses: { '200': { description: OK } } }
+  /lots/{id}/bids:
+    parameters:
+      - $ref: '#/components/parameters/id'
+      - { name: Idempotency-Key, in: header, schema: { type: string, pattern: '^[\w-]{8,100}$' }, description: Repeating a request with the same key returns the first result (200) instead of a new bid }
+    post:
+      summary: Place a bid (the concurrent operation)
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties: { amount: { type: integer, minimum: 1 }, auto_max: { type: integer, description: Optional auto-bid limit } }
+      responses:
+        '201':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  amount: { type: integer }
+                  leading: { type: boolean }
+                  current_price: { type: integer }
+                  leader_id: { type: integer }
+                  bid_count: { type: integer }
+                  replay: { type: boolean }
+        '200': { description: Replay of an earlier request with the same Idempotency-Key }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /lots/{id}/auto-bid:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    put:
+      security: [{ session: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [max_amount], properties: { max_amount: { type: integer, description: 0 turns it off } } } } } }
+      responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Problem' } }
+  /payments/{id}:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      security: [{ session: [] }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Problem' } }
+  /payments/{id}/pay:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      summary: Simulated checkout; repeat submits are harmless
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, last_name, phone, email, address, card_number, card_exp, card_cvv]
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+                phone: { type: string }
+                email: { type: string, format: email }
+                address: { type: string }
+                card_number: { type: string }
+                card_exp: { type: string, pattern: '^(0[1-9]|1[0-2])/\d{2}$' }
+                card_cvv: { type: string, pattern: '^\d{3,4}$' }
+      responses: { '200': { description: Paid }, '400': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' } }
+  /notifications:
+    get:
+      security: [{ session: [] }]
+      parameters: [{ $ref: '#/components/parameters/page' }]
+      responses: { '200': { description: OK } }
+  /notifications/read:
+    post: { security: [{ session: [] }], responses: { '204': { description: OK } } }
+  /admin/lots:
+    get:
+      summary: Moderation queue (404 for non-admins)
+      security: [{ session: [] }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Problem' } }
+  /admin/lots/{id}/moderate:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      security: [{ session: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [decision], properties: { decision: { type: string, enum: [approve, reject] }, note: { type: string } } } } } }
+      responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Problem' } }
+  /admin/lots/{id}/cancel:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      security: [{ session: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [note], properties: { note: { type: string } } } } } }
+      responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Problem' } }
+  /admin/users:
+    get:
+      security: [{ session: [] }]
+      parameters: [{ name: q, in: query, schema: { type: string } }, { name: blocked, in: query, schema: { type: string, enum: ['0', '1'] } }]
+      responses: { '200': { description: OK } }
+  /admin/users/{id}/blocked:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    put:
+      security: [{ session: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [blocked], properties: { blocked: { type: boolean }, reason: { type: string } } } } } }
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Problem' } }

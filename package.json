@@ -1,0 +1,25 @@
+{
+  "name": "retrolot",
+  "version": "1.0.0",
+  "description": "Online auction of vintage items (course project)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "seed": "node --env-file-if-exists=.env seed.js --reset",
+    "test": "node --test \"test/*.test.js\"",
+    "lint": "node scripts/check.js",
+    "make-admin": "node --env-file-if-exists=.env scripts/make-admin.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.1.0",
+    "nodemailer": "^6.10.1"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

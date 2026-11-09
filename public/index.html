@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RetroLot</title>
+  <meta name="description" content="RetroLot: онлайн-аукціон вінтажних речей. Ставки в реальному часі, автоставка, список спостереження.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/i18n.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#app">Перейти до вмісту</a>
+  <header class="top">
+    <a class="brand" href="/" data-link><span class="retro">Retro</span>Lot</a>
+    <nav class="top-actions" aria-label="Основна навігація">
+      <a class="btn" id="nav-create" href="/create" data-link data-i18n="create">Створити</a>
+      <a class="btn" id="nav-history" href="/history" data-link data-i18n="history">Історія</a>
+      <button class="circle" id="lang" type="button" aria-label="Мова / Language">EN</button>
+      <div class="account">
+        <a class="circle" id="login-link" href="/login" data-link aria-label="Увійти">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </a>
+        <button class="circle avatar" id="avatar" type="button" aria-haspopup="menu" aria-expanded="false" hidden></button>
+        <div class="menu" id="menu" role="menu" hidden>
+          <a href="/profile" data-link role="menuitem" data-i18n="profile">Профіль</a>
+          <a href="/my-lots" data-link role="menuitem" data-i18n="my_lots">Мої лоти</a>
+          <a href="/admin" data-link role="menuitem" id="menu-admin" data-i18n="admin" hidden>Адмін-панель</a>
+          <a href="/support" data-link role="menuitem" data-i18n="support">Підтримка</a>
+          <button type="button" role="menuitem" id="logout" data-i18n="logout">Вийти</button>
+        </div>
+      </div>
+    </nav>
+  </header>
+  <main id="app" tabindex="-1"></main>
+  <footer class="foot">
+    <span>RetroLot</span>
+    <a href="/support" data-link data-i18n="support">Підтримка</a>
+    <a href="/privacy" data-link data-i18n="privacy">Політика конфіденційності</a>
+    <a href="/terms" data-link data-i18n="terms">Умови користування</a>
+  </footer>
+</body>
+</html>
