@@ -115,7 +115,7 @@ components:
         last_name: { type: string }
         phone: { type: string }
         address: { type: string }
-        card_number: { type: string, description: Luhn-checked, only last 4 stored }
+        card_number: { type: string, description: 'Luhn-checked, only last 4 stored' }
     PaymentShort:
       type: object
       properties:
@@ -146,6 +146,7 @@ paths:
       responses: { '200': { description: OK } }
   /auth/register:
     post:
+      summary: "Register and log in"
       requestBody:
         required: true
         content:
@@ -155,11 +156,12 @@ paths:
               required: [email, password, name]
               properties: { email: { type: string, format: email }, password: { type: string, minLength: 8 }, name: { type: string, minLength: 2 } }
       responses:
-        '201': { description: Created, sets sid cookie, content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
+        '201': { description: 'Created, sets sid cookie', content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
   /auth/login:
     post:
+      summary: "Log in"
       requestBody:
         required: true
         content:
@@ -169,14 +171,16 @@ paths:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
         '401': { $ref: '#/components/responses/Problem' }
   /auth/logout:
-    post: { responses: { '204': { description: Logged out } } }
+    post: { summary: "Log out", responses: { '204': { description: Logged out } } }
   /auth/me:
     get:
+      summary: "Current user profile"
       security: [{ session: [] }]
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
         '401': { $ref: '#/components/responses/Problem' }
     patch:
+      summary: "Update profile"
       security: [{ session: [] }]
       requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
       responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Problem' } }
@@ -185,9 +189,9 @@ paths:
   /auth/google/callback:
     get: { summary: OAuth callback, responses: { '302': { description: Redirect to / or /login?error=google } } }
   /categories:
-    get: { responses: { '200': { description: OK } } }
+    get: { summary: "List categories", responses: { '200': { description: OK } } }
   /tags:
-    get: { responses: { '200': { description: OK } } }
+    get: { summary: "List tags", responses: { '200': { description: OK } } }
   /lots:
     get:
       summary: Public catalogue (active lots), server-side filter and paging
@@ -224,11 +228,13 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
   /lots/mine:
     get:
+      summary: "Seller's own lots"
       security: [{ session: [] }]
       parameters: [{ name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/page' }]
       responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LotPage' } } } } }
   /history:
     get:
+      summary: "Bought, sold and bid-on lots"
       security: [{ session: [] }]
       parameters:
         - { name: filter, in: query, schema: { type: string, enum: [all, bought, sold, bid] } }
@@ -237,10 +243,12 @@ paths:
       responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LotPage' } } } } }
   /watchlist:
     get:
+      summary: "Watched lots"
       security: [{ session: [] }]
       responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LotPage' } } } } }
   /bids/mine:
     get:
+      summary: "User's bids"
       security: [{ session: [] }]
       responses: { '200': { description: OK } }
   /lots/{id}:
@@ -261,12 +269,13 @@ paths:
   /lots/{id}/withdraw:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
+      summary: "Withdraw a lot before the first bid"
       security: [{ session: [] }]
       responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Problem' } }
   /lots/{id}/watch:
     parameters: [{ $ref: '#/components/parameters/id' }]
-    put: { security: [{ session: [] }], responses: { '200': { description: OK } } }
-    delete: { security: [{ session: [] }], responses: { '200': { description: OK } } }
+    put: { summary: "Watch a lot", security: [{ session: [] }], responses: { '200': { description: OK } } }
+    delete: { summary: "Stop watching a lot", security: [{ session: [] }], responses: { '200': { description: OK } } }
   /lots/{id}/bids:
     parameters:
       - $ref: '#/components/parameters/id'
@@ -304,12 +313,14 @@ paths:
   /lots/{id}/auto-bid:
     parameters: [{ $ref: '#/components/parameters/id' }]
     put:
+      summary: "Set or remove an auto-bid limit"
       security: [{ session: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [max_amount], properties: { max_amount: { type: integer, description: 0 turns it off } } } } } }
       responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Problem' } }
   /payments/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
+      summary: "Payment for the payment page"
       security: [{ session: [] }]
       responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Problem' } }
   /payments/{id}/pay:
@@ -336,11 +347,12 @@ paths:
       responses: { '200': { description: Paid }, '400': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' } }
   /notifications:
     get:
+      summary: "Notifications with unread count"
       security: [{ session: [] }]
       parameters: [{ $ref: '#/components/parameters/page' }]
       responses: { '200': { description: OK } }
   /notifications/read:
-    post: { security: [{ session: [] }], responses: { '204': { description: OK } } }
+    post: { summary: "Mark all notifications read", security: [{ session: [] }], responses: { '204': { description: OK } } }
   /admin/lots:
     get:
       summary: Moderation queue (404 for non-admins)
@@ -349,23 +361,27 @@ paths:
   /admin/lots/{id}/moderate:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
+      summary: "Approve or reject a lot"
       security: [{ session: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [decision], properties: { decision: { type: string, enum: [approve, reject] }, note: { type: string } } } } } }
       responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Problem' } }
   /admin/lots/{id}/cancel:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
+      summary: "Cancel an auction"
       security: [{ session: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [note], properties: { note: { type: string } } } } } }
       responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Problem' } }
   /admin/users:
     get:
+      summary: "List users"
       security: [{ session: [] }]
       parameters: [{ name: q, in: query, schema: { type: string } }, { name: blocked, in: query, schema: { type: string, enum: ['0', '1'] } }]
       responses: { '200': { description: OK } }
   /admin/users/{id}/blocked:
     parameters: [{ $ref: '#/components/parameters/id' }]
     put:
+      summary: "Block or unblock a user"
       security: [{ session: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [blocked], properties: { blocked: { type: boolean }, reason: { type: string } } } } } }
       responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Problem' } }
